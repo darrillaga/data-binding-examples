@@ -1,0 +1,40 @@
+#Refs
+#http://blog.originate.com/blog/2015/03/22/android-and-ci-and-gradle-a-how-to/
+#Avoiding dead: http://stackoverflow.com/a/33432440
+
+general:
+    build_dir: DataBindingExamples
+
+machine:
+  environment:
+    ANDROID_HOME: /home/ubuntu/android
+  java:
+    version: oraclejdk8
+
+dependencies:
+  cache_directories:
+    - ~/.android
+    - ~/android
+  override:
+    - (source ../scripts/environmentSetup.sh && getAndroidSDK)
+
+test:
+  pre:
+    # start the emulator
+    - emulator -avd circleci-android22 -no-audio -no-window -no-skin:
+        background: true
+        parallel: true
+    - ./gradlew assembleDebug -PpreDexEnable=false -Pcom.android.build.threadPoolSize=1 -Dorg.gradle.parallel=false -Dorg.gradle.jvmargs="-Xms512m -Xmx512m" -Dorg.gradle.daemon=false
+    # wait for it to have booted
+    - circle-android wait-for-boot
+  override:
+    # run ui tests the emulator.
+    - ./gradlew testDebugUnitTest
+    # run unit tests against the emulator.
+    - ./gradlew connectedDebugAndroidTest
+    # copy the build outputs to artifacts
+    - cp -r mobile/build/outputs $CIRCLE_ARTIFACTS
+    # copy unit test results
+    - cp -r mobile/build/test-results $CIRCLE_TEST_REPORTS
+    # copy the test results to the test results directory.
+    - cp -r mobile/build/reports/tests/* $CIRCLE_TEST_REPORTS
